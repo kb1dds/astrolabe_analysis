@@ -216,6 +216,17 @@ data_individual <- data_individual %>%
   mutate(solar_system_object=!is.na(right_ascension)) %>%
   mutate(sun_right_ascension=sun_ra(date)) # Yes, it looks like we recomputed this.. oh well
 
+# Set the phases in proper order
+# This is a small hack because I record Moon phase as waxing or waning, 
+# but I don't record wax/wane status on other objects... perhaps I should!
+phases<-c(sapply(1:99,function(x){sprintf('Wax%02d',x)}),
+          'Full',
+          sapply(99:1,function(x){sprintf('Wane%02d',x)}),
+          1:99) # Bit of a hack here...
+
+data_individual <- data_individual %>% 
+  mutate(phase=factor(phase,phases))
+
 # Join in the fixed geocentric locations of the stars
 starchart <- read_csv('~/astrolabe_analysis/stars.csv')
 
@@ -440,3 +451,25 @@ odata %>%
   ylab('Saturn-to-sun right ascension difference (hours)') +
   theme(legend.position = 'top')
 
+#### Phase analysis
+
+data_individual %>% 
+  filter(object=='Moon') %>%
+  mutate(diff=(right_ascension-sun_right_ascension)%%24) %>%
+  group_by(phase) %>%
+  ggplot(aes(y=phase,x=diff)) +
+  geom_ref_line(v=0)+
+  geom_ref_line(v=12)+
+  geom_ref_line(v=24)+
+  geom_boxplot()
+
+data_individual %>% 
+  filter(object=='Venus') %>%
+  filter(!is.na(phase)) %>%
+  mutate(diff=(right_ascension-sun_right_ascension)%%24) %>%
+  group_by(phase) %>%
+  ggplot(aes(y=phase,x=diff)) +
+  geom_ref_line(v=0)+
+  geom_ref_line(v=12)+
+  geom_ref_line(v=24)+
+  geom_point()
