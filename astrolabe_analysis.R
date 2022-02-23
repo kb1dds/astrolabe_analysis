@@ -472,45 +472,104 @@ odata %>%
 ## Trying to get multiple right ascension differences
 
 data_individual %>% 
-  filter(object=='Jupiter') %>% 
+  filter(object=='Venus') %>% 
   mutate(diff=right_ascension-sun_right_ascension) %>% 
   group_by(object,round(diff/2)*2) %>% 
-  summarise(mindate=min(date),maxdate=max(date)) %>%
-  mutate(synodic=as.duration(mindate%--%maxdate)/ddays(1)) %>%
-  filter(synodic>10)%>%
-  mutate(synodic=ifelse(synodic>500,synodic/2,synodic),
-         radius=(synodic/(synodic-365))^(2/3))
-
-data_individual %>% 
-  filter(object=='Saturn') %>% 
-  mutate(diff=right_ascension-sun_right_ascension) %>% 
-  group_by(object,round(diff/2)*2) %>% 
-  summarise(mindate=min(date),maxdate=max(date)) %>%
-  mutate(synodic=as.duration(mindate%--%maxdate)/ddays(1)) %>%
-  filter(synodic>10)%>%
-  mutate(synodic=ifelse(synodic>500,synodic/2,synodic),
-         radius=(synodic/(synodic-365))^(2/3))
-
-data_individual %>% 
-  filter(object=='Mars') %>% 
-  mutate(diff=right_ascension-sun_right_ascension) %>% 
-  group_by(object,round(diff/2)*2) %>% 
-  summarise(mindate=min(date),maxdate=max(date)) %>%
-  mutate(synodic=as.duration(mindate%--%maxdate)/ddays(1)) %>%
-  filter(synodic>10)%>%
-  mutate(#synodic=ifelse(synodic>500,synodic/2,synodic),
-         radius=(synodic/(synodic-365))^(2/3))
+  nest(data=date) %>%
+  filter(length(data)>2) %>%
+  unnest(cols=data) %>%
+  summarise(synodic=combn(date,2,function(x){as.duration(x[[1]]%--%x[[2]])/ddays(1)})) %>%
+  filter(synodic>200) %>%
+  mutate(radius=(synodic/(synodic+365))^(2/3)) %>%
+  ggplot(aes(synodic)) + geom_histogram()
 
 data_individual %>% 
   filter(object=='Venus') %>% 
   mutate(diff=right_ascension-sun_right_ascension) %>% 
   group_by(object,round(diff/2)*2) %>% 
-  summarise(mindate=min(date),maxdate=max(date)) %>%
-  mutate(synodic=as.duration(mindate%--%maxdate)/ddays(1)) %>%
-  filter(synodic>10)%>%
-  mutate(#synodic=ifelse(synodic>500,synodic/2,synodic),
-         radius=(synodic/(synodic+365))^(2/3))
+  nest(data=date) %>%
+  filter(length(data)>2) %>%
+  unnest(cols=data) %>%
+  summarise(synodic=combn(date,2,function(x){as.duration(x[[1]]%--%x[[2]])/ddays(1)})) %>%
+  filter(synodic>200) %>%
+  mutate(radius=(synodic/(synodic+365))^(2/3)) %>%
+  ggplot(aes(radius)) + geom_histogram()
 
+data_individual %>% 
+  filter(object=='Mars') %>% 
+  mutate(diff=right_ascension-sun_right_ascension) %>% 
+  group_by(object,round(diff/2)*2) %>% 
+  nest(data=date) %>%
+  filter(length(data)>2) %>%
+  unnest(cols=data) %>%
+  summarise(synodic=combn(date,2,function(x){as.duration(x[[1]]%--%x[[2]])/ddays(1)})) %>%
+  filter(synodic>200) %>%
+  mutate(radius=(synodic/(synodic-365))^(2/3)) %>%
+  ggplot(aes(synodic)) + geom_histogram()
+
+data_individual %>% 
+  filter(object=='Mars') %>% 
+  mutate(diff=right_ascension-sun_right_ascension) %>% 
+  group_by(object,round(diff/2)*2) %>% 
+  nest(data=date) %>%
+  filter(length(data)>2) %>%
+  unnest(cols=data) %>%
+  summarise(synodic=combn(date,2,function(x){as.duration(x[[1]]%--%x[[2]])/ddays(1)})) %>%
+  filter(synodic>200) %>%
+  mutate(radius=(synodic/(synodic-365))^(2/3)) %>%
+  ggplot(aes(radius)) + geom_histogram()
+
+data_individual %>% 
+  filter(object=='Jupiter') %>% 
+  mutate(diff=right_ascension-sun_right_ascension) %>% 
+  group_by(object,round(diff/2)*2) %>% 
+  nest(data=date) %>%
+  filter(length(data)>2) %>%
+  unnest(cols=data) %>%
+  summarise(synodic=combn(date,2,function(x){as.duration(x[[1]]%--%x[[2]])/ddays(1)})) %>%
+  filter(synodic>365) %>%
+  mutate(synodic=ifelse(synodic>600,synodic/2,synodic),
+         radius=(synodic/(synodic-365))^(2/3)) %>%
+  ggplot(aes(synodic)) + geom_histogram()
+
+data_individual %>% 
+  filter(object=='Jupiter') %>% 
+  mutate(diff=right_ascension-sun_right_ascension) %>% 
+  group_by(object,round(diff/2)*2) %>% 
+  nest(data=date) %>%
+  filter(length(data)>2) %>%
+  unnest(cols=data) %>%
+  summarise(synodic=combn(date,2,function(x){as.duration(x[[1]]%--%x[[2]])/ddays(1)})) %>%
+  filter(synodic>365) %>%
+  mutate(synodic=ifelse(synodic>600,synodic/2,synodic),
+         radius=(synodic/(synodic-365))^(2/3)) %>%
+  ggplot(aes(radius)) + geom_histogram() + scale_x_continuous(limits=c(1,10))
+
+data_individual %>% 
+  filter(object=='Saturn') %>% 
+  mutate(diff=right_ascension-sun_right_ascension) %>% 
+  group_by(object,round(diff/2)*2) %>% 
+  nest(data=date) %>%
+  filter(length(data)>2) %>%
+  unnest(cols=data) %>%
+  summarise(synodic=combn(date,2,function(x){as.duration(x[[1]]%--%x[[2]])/ddays(1)})) %>%
+  filter(synodic>365) %>%
+  mutate(synodic=ifelse(synodic>600,synodic/2,synodic),
+         radius=(synodic/(synodic-365))^(2/3)) %>%
+  ggplot(aes(synodic)) + geom_histogram()
+
+data_individual %>% 
+  filter(object=='Saturn') %>% 
+  mutate(diff=right_ascension-sun_right_ascension) %>% 
+  group_by(object,round(diff/2)*2) %>% 
+  nest(data=date) %>%
+  filter(length(data)>2) %>%
+  unnest(cols=data) %>%
+  summarise(synodic=combn(date,2,function(x){as.duration(x[[1]]%--%x[[2]])/ddays(1)})) %>%
+  filter(synodic>365) %>%
+  mutate(synodic=ifelse(synodic>600,synodic/2,synodic),
+         radius=(synodic/(synodic-365))^(2/3)) %>%
+  ggplot(aes(radius)) + geom_histogram() + scale_x_continuous(limits=c(1,15))
 #### Phase analysis
 
 data_individual %>% 
