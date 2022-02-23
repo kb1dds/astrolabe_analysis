@@ -361,6 +361,38 @@ data_individual %>%
 
 #### Determining orbital radii
 
+### Planetary orbital radii all at once, by looking at elapsed time between 
+### right ascension recurrences
+
+periods_radii <- data_individual %>%
+  filter(solar_system_object&object!='Sun'&object!='Moon') %>% # Only planets orbit the sun
+  mutate(object=factor(object,c('Venus','Mars','Jupiter','Saturn'))) %>% # Order planets by orbit position
+  mutate(diff=right_ascension-sun_right_ascension) %>%  # Referencing against the sun
+  group_by(object,round(diff/2)*2) %>% # Does the recurrence grouping: 2 hour bins 
+  nest(data=date) %>%
+  filter(length(data)>2) %>% # Get rid of bins with too few observations
+  unnest(cols=data) %>%
+  summarise(synodic=combn(date,2,function(x){as.duration(x[[1]]%--%x[[2]])/ddays(1)})) %>% # Compute synodic periods (days)
+  mutate(synodic=if_else((object=='Jupiter'|object=='Saturn')&synodic>600, # I observed two full periods for Jupiter and Saturn only, so...
+                         synodic/2,  # ...if the period is unusually large we're looking at doubled periods, so split the period in half
+                         synodic)) %>%   # ...otherwise it's fine as is
+  filter(synodic>200) %>% # Short synodic periods aren't actually synodic periods; they're the planet being observed sequentially
+  mutate(radius=if_else(object=='Venus',  # Compute orbital radii (AU) using Kepler
+                        (synodic/(synodic+365))^(2/3),  # Venus is an inner planet
+                        (synodic/(synodic-365))^(2/3))) %>% # all others are outer
+  ungroup() %>%
+  select(object,synodic,radius) %>%
+  group_by(object)
+
+periods_radii %>%
+  ggplot(aes(synodic,object)) + geom_boxplot() +
+  xlab('Synodic period (days)')
+
+periods_radii %>% 
+  filter(radius < 20) %>%
+  ggplot(aes(radius,object)) + geom_boxplot() +
+  xlab('Orbital semi-major axis (AU)')
+
 ### Determining Venus's orbital radius by fitting a sinusoid
 venus_sinusoid <- nls(diff~a*sin(2*pi*n/b+ph)+12,
     start=list(a=3,b=600,ph=0), # Eyeballed off graph
@@ -469,107 +501,6 @@ odata %>%
   ylab('Saturn-to-sun right ascension difference (hours)') +
   theme(legend.position = 'top')
 
-## Trying to get multiple right ascension differences
-
-data_individual %>% 
-  filter(object=='Venus') %>% 
-  mutate(diff=right_ascension-sun_right_ascension) %>% 
-  group_by(object,round(diff/2)*2) %>% 
-  nest(data=date) %>%
-  filter(length(data)>2) %>%
-  unnest(cols=data) %>%
-  summarise(synodic=combn(date,2,function(x){as.duration(x[[1]]%--%x[[2]])/ddays(1)})) %>%
-  filter(synodic>200) %>%
-  mutate(radius=(synodic/(synodic+365))^(2/3)) %>%
-  ggplot(aes(synodic)) + geom_histogram()
-
-data_individual %>% 
-  filter(object=='Venus') %>% 
-  mutate(diff=right_ascension-sun_right_ascension) %>% 
-  group_by(object,round(diff/2)*2) %>% 
-  nest(data=date) %>%
-  filter(length(data)>2) %>%
-  unnest(cols=data) %>%
-  summarise(synodic=combn(date,2,function(x){as.duration(x[[1]]%--%x[[2]])/ddays(1)})) %>%
-  filter(synodic>200) %>%
-  mutate(radius=(synodic/(synodic+365))^(2/3)) %>%
-  ggplot(aes(radius)) + geom_histogram()
-
-data_individual %>% 
-  filter(object=='Mars') %>% 
-  mutate(diff=right_ascension-sun_right_ascension) %>% 
-  group_by(object,round(diff/2)*2) %>% 
-  nest(data=date) %>%
-  filter(length(data)>2) %>%
-  unnest(cols=data) %>%
-  summarise(synodic=combn(date,2,function(x){as.duration(x[[1]]%--%x[[2]])/ddays(1)})) %>%
-  filter(synodic>200) %>%
-  mutate(radius=(synodic/(synodic-365))^(2/3)) %>%
-  ggplot(aes(synodic)) + geom_histogram()
-
-data_individual %>% 
-  filter(object=='Mars') %>% 
-  mutate(diff=right_ascension-sun_right_ascension) %>% 
-  group_by(object,round(diff/2)*2) %>% 
-  nest(data=date) %>%
-  filter(length(data)>2) %>%
-  unnest(cols=data) %>%
-  summarise(synodic=combn(date,2,function(x){as.duration(x[[1]]%--%x[[2]])/ddays(1)})) %>%
-  filter(synodic>200) %>%
-  mutate(radius=(synodic/(synodic-365))^(2/3)) %>%
-  ggplot(aes(radius)) + geom_histogram()
-
-data_individual %>% 
-  filter(object=='Jupiter') %>% 
-  mutate(diff=right_ascension-sun_right_ascension) %>% 
-  group_by(object,round(diff/2)*2) %>% 
-  nest(data=date) %>%
-  filter(length(data)>2) %>%
-  unnest(cols=data) %>%
-  summarise(synodic=combn(date,2,function(x){as.duration(x[[1]]%--%x[[2]])/ddays(1)})) %>%
-  filter(synodic>365) %>%
-  mutate(synodic=ifelse(synodic>600,synodic/2,synodic),
-         radius=(synodic/(synodic-365))^(2/3)) %>%
-  ggplot(aes(synodic)) + geom_histogram()
-
-data_individual %>% 
-  filter(object=='Jupiter') %>% 
-  mutate(diff=right_ascension-sun_right_ascension) %>% 
-  group_by(object,round(diff/2)*2) %>% 
-  nest(data=date) %>%
-  filter(length(data)>2) %>%
-  unnest(cols=data) %>%
-  summarise(synodic=combn(date,2,function(x){as.duration(x[[1]]%--%x[[2]])/ddays(1)})) %>%
-  filter(synodic>365) %>%
-  mutate(synodic=ifelse(synodic>600,synodic/2,synodic),
-         radius=(synodic/(synodic-365))^(2/3)) %>%
-  ggplot(aes(radius)) + geom_histogram() + scale_x_continuous(limits=c(1,10))
-
-data_individual %>% 
-  filter(object=='Saturn') %>% 
-  mutate(diff=right_ascension-sun_right_ascension) %>% 
-  group_by(object,round(diff/2)*2) %>% 
-  nest(data=date) %>%
-  filter(length(data)>2) %>%
-  unnest(cols=data) %>%
-  summarise(synodic=combn(date,2,function(x){as.duration(x[[1]]%--%x[[2]])/ddays(1)})) %>%
-  filter(synodic>365) %>%
-  mutate(synodic=ifelse(synodic>600,synodic/2,synodic),
-         radius=(synodic/(synodic-365))^(2/3)) %>%
-  ggplot(aes(synodic)) + geom_histogram()
-
-data_individual %>% 
-  filter(object=='Saturn') %>% 
-  mutate(diff=right_ascension-sun_right_ascension) %>% 
-  group_by(object,round(diff/2)*2) %>% 
-  nest(data=date) %>%
-  filter(length(data)>2) %>%
-  unnest(cols=data) %>%
-  summarise(synodic=combn(date,2,function(x){as.duration(x[[1]]%--%x[[2]])/ddays(1)})) %>%
-  filter(synodic>365) %>%
-  mutate(synodic=ifelse(synodic>600,synodic/2,synodic),
-         radius=(synodic/(synodic-365))^(2/3)) %>%
-  ggplot(aes(radius)) + geom_histogram() + scale_x_continuous(limits=c(1,15))
 #### Phase analysis
 
 data_individual %>% 
