@@ -121,6 +121,16 @@ data %>%
 
 data %>% 
   mutate(time_diff = interval(`Local true apparent solar time`,
+                              `Local mean time`,tzone='EST'),
+         daytime=is.na(`Sun elevation`)) %>%
+  ggplot(aes(x=date,y=time_diff/60,color=daytime)) + 
+  geom_point() +
+  ylim(-120,120) + 
+  ylab('Error (minutes)') +
+  theme(legend.position = 'top')
+
+data %>% 
+  mutate(time_diff = interval(`Local true apparent solar time`,
                               `Local mean time`,tzone='EST')) %>%
   ggplot(aes(y=time_diff/60)) + 
   geom_histogram(bins=100) +
@@ -247,6 +257,13 @@ data_individual %>%
   stat_count() + 
   xlab('Sightings per observing session')
 
+data_individual %>% 
+  group_by(date,daytime) %>% 
+  count() %>% 
+  ggplot(aes(as.factor(n),fill=daytime)) + 
+  stat_count() + 
+  xlab('Sightings per observing session')
+
 #### Elevation estimation error
 
 # Sun elevation error
@@ -261,9 +278,10 @@ sun_elevation_data <- data_individual %>%
                                    sidereal_time)*180/pi,
          elevation_difference=elevation-expected_elevation) 
 
+mean(sun_elevation_data$elevation_difference,na.rm=TRUE)
 sd(sun_elevation_data$elevation_difference,na.rm=TRUE)
 
-sun_elevation_data %>% ggplot(aes(elevation_difference)) + geom_histogram()
+sun_elevation_data %>% ggplot(aes(elevation_difference)) + geom_histogram(bins=100)
 
 sun_elevation_data %>%
   with(qqnorm(elevation_difference,ylim=c(-5,5)))
@@ -450,6 +468,48 @@ odata %>%
   xlab('Date') +
   ylab('Saturn-to-sun right ascension difference (hours)') +
   theme(legend.position = 'top')
+
+## Trying to get multiple right ascension differences
+
+data_individual %>% 
+  filter(object=='Jupiter') %>% 
+  mutate(diff=right_ascension-sun_right_ascension) %>% 
+  group_by(object,round(diff/2)*2) %>% 
+  summarise(mindate=min(date),maxdate=max(date)) %>%
+  mutate(synodic=as.duration(mindate%--%maxdate)/ddays(1)) %>%
+  filter(synodic>10)%>%
+  mutate(synodic=ifelse(synodic>500,synodic/2,synodic),
+         radius=(synodic/(synodic-365))^(2/3))
+
+data_individual %>% 
+  filter(object=='Saturn') %>% 
+  mutate(diff=right_ascension-sun_right_ascension) %>% 
+  group_by(object,round(diff/2)*2) %>% 
+  summarise(mindate=min(date),maxdate=max(date)) %>%
+  mutate(synodic=as.duration(mindate%--%maxdate)/ddays(1)) %>%
+  filter(synodic>10)%>%
+  mutate(synodic=ifelse(synodic>500,synodic/2,synodic),
+         radius=(synodic/(synodic-365))^(2/3))
+
+data_individual %>% 
+  filter(object=='Mars') %>% 
+  mutate(diff=right_ascension-sun_right_ascension) %>% 
+  group_by(object,round(diff/2)*2) %>% 
+  summarise(mindate=min(date),maxdate=max(date)) %>%
+  mutate(synodic=as.duration(mindate%--%maxdate)/ddays(1)) %>%
+  filter(synodic>10)%>%
+  mutate(#synodic=ifelse(synodic>500,synodic/2,synodic),
+         radius=(synodic/(synodic-365))^(2/3))
+
+data_individual %>% 
+  filter(object=='Venus') %>% 
+  mutate(diff=right_ascension-sun_right_ascension) %>% 
+  group_by(object,round(diff/2)*2) %>% 
+  summarise(mindate=min(date),maxdate=max(date)) %>%
+  mutate(synodic=as.duration(mindate%--%maxdate)/ddays(1)) %>%
+  filter(synodic>10)%>%
+  mutate(#synodic=ifelse(synodic>500,synodic/2,synodic),
+         radius=(synodic/(synodic+365))^(2/3))
 
 #### Phase analysis
 
