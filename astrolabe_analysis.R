@@ -281,7 +281,9 @@ sun_elevation_data <- data_individual %>%
 mean(sun_elevation_data$elevation_difference,na.rm=TRUE)
 sd(sun_elevation_data$elevation_difference,na.rm=TRUE)
 
-sun_elevation_data %>% ggplot(aes(elevation_difference)) + geom_histogram(bins=100)
+sun_elevation_data %>% ggplot(aes(elevation_difference)) + 
+  geom_histogram(binwidth = 0.2) +
+  scale_x_continuous(limits = c(-10,10))
 
 sun_elevation_data %>%
   with(qqnorm(elevation_difference,ylim=c(-5,5)))
@@ -335,6 +337,15 @@ elevation_data %>%
   geom_point() + 
   geom_smooth(method='lm') +
   scale_y_continuous(limits=c(-5,5))
+
+# Difference between sun/star elevation error?
+elevation_anova <- with(bind_rows(mutate(elevation_data,
+             solar=FALSE),
+        mutate(sun_elevation_data,
+             solar=TRUE)),
+     aov(elevation_difference~solar))
+
+summary(elevation_anova)
 
 #### Planets
 
