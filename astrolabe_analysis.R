@@ -44,7 +44,7 @@ radc2a <- function(lat,ra,dec,st){
 }
 
 utc2s <- function(lon,date){
-  # Convert Longitude (degrees), Julian date past 1 Jan 2000,
+  # Convert Longitude (degrees), Julian date past 1 Jan 2000, to sidereal time (radians)
   # Source https://en.wikipedia.org/wiki/Sidereal_time
 
   n <- as.duration(ymd('2000-01-01') %--% date)/ddays(1)
@@ -364,6 +364,9 @@ data_individual %>%
 ### Planetary orbital radii all at once, by looking at elapsed time between 
 ### right ascension recurrences
 
+known_radii <- tibble(object=factor(c('Venus','Mars','Jupiter','Saturn')),
+                      true_radius=c(0.72,1.5,5.2,9.6))
+
 periods_radii <- data_individual %>%
   filter(solar_system_object&object!='Sun'&object!='Moon') %>% # Only planets orbit the sun
   mutate(object=factor(object,c('Venus','Mars','Jupiter','Saturn'))) %>% # Order planets by orbit position
@@ -389,8 +392,10 @@ periods_radii %>%
   xlab('Synodic period (days)')
 
 periods_radii %>% 
+  left_join(known_radii,by='object') %>%
   filter(radius < 20) %>%
-  ggplot(aes(radius,object)) + geom_boxplot() +
+  ggplot() + geom_boxplot(aes(radius,object)) +
+  geom_point(aes(true_radius,object),color='red',shape='square') +
   xlab('Orbital semi-major axis (AU)')
 
 ### Determining Venus's orbital radius by fitting a sinusoid
