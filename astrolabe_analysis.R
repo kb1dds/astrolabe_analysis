@@ -145,6 +145,33 @@ planet_ra <- function(n,xh,yh,zh){
   return(atan2(YE,XE)*24/6.28319)
 }
 
+planet_xy_from_data <- function(n,ra,r) {
+  # Determine planet xh,yh heliocentric coordinates from a radius estimate (r) in AU 
+  # and date past 1 Jan 2000
+  
+  # Orbital elements of the earth around the sun
+  EES <- (0.016709-1.151E-9*n)*pi/180
+  MMS <- (356.0470+0.9856002585*n)*pi/180
+  WWS <- (282.9404+4.70935E-5*n)*pi/180
+  
+  # Heliocentric position of the earth
+  ES <- MMS+EES*sin(MMS)*(1.0+EES*cos(MMS))
+  XVS <- cos(ES)-EES
+  YVS <- sqrt(1.0-EES*EES)*sin(ES)
+  VS <- atan2(YVS,XVS)	
+  RS <- sqrt(XVS*XVS+YVS*YVS)
+  LONSUN <- VS+WWS
+  XE <- -RS*cos(LONSUN)
+  YE <- -RS*sin(LONSUN)
+  
+  A <- tan(ra*pi/12)
+  c <- (XE-YE)/r
+  
+  phi <- 2*atan2(sqrt(A^2-c^2+1)-1,A+c)
+  
+  return(tibble(xhp=r*cos(phi),yhp=r*sin(phi)))
+}
+
 #### Actual code begins!
 
 # Set the planets in orbit order (I can't see Pluto anyway, so no need to quibble here!)
@@ -524,6 +551,12 @@ data_planetary_extended %>%
 # True planet locations
 data_planetary_extended %>% 
   ggplot(aes(x=xh,y=yh,color=object)) + geom_point()
+
+# True planet locations
+data_planetary_extended %>% 
+  mutate(pos=planet_xy_from_data(n,right_ascension,AA)) %>%
+  unnest(pos) %>%
+  ggplot(aes(x=xhp,y=yhp,color=object)) + geom_point()
 
 ### Determining Venus's orbital radius by fitting a sinusoid
 venus_sinusoid <- nls(diff~a*sin(2*pi*n/b+ph)+12,
