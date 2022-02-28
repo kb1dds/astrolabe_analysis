@@ -80,6 +80,71 @@ sundc <- function(n){
   return(atan2(num,den)*180/pi)
 }
 
+heliocentric <- function(NN,II,WW,AA,EE,MM){
+  # Compute heliocentric position of a body orbiting the sun
+  #
+  # Inputs:
+  # Orbital elements of planet (about the sun)
+  # NN = longitude of ascending node (radians)
+  # II = inclination to the ecliptic (radians)
+  # WW = Argument of perihelion (radians)
+  # AA = mean distance to the sun (AU)
+  # EE = eccentricity (dimensionless)
+  # MM = Mean anomaly (radians)
+  #
+  # Returns a tibble with columns: xh, yh, zh (AU)
+  #
+  # Reference: [https://stjarnhimlen.se/comp/ppcomp.html]
+
+  # Computing current radius to the sun (AU)
+  E <- MM+EE*sin(MM)*(1.0+EE*cos(MM))
+	XV <- AA*(cos(E)-EE)
+	YV <- AA*sqrt(1.0-EE*EE)*sin(E)
+	V <- atan2(YV,XV)
+	R <- sqrt(XV*XV+YV*YV)
+	
+  #  Planet's position in space (centered on the sun in AU)
+	return(tibble(xh=R*(cos(NN)*cos(V+WW)-sin(NN)*sin(V+WW)*cos(II)),
+	              yh=R*(sin(NN)*cos(V+WW)+cos(NN)*sin(V+WW)*cos(II)),
+	              zh=R*(sin(V+WW)*sin(II))))
+}
+
+planet_ra <- function(n,xh,yh,zh){
+  # Compute right ascension of a planet based on its heliocentric 
+  # coordinates (xh,yh,zh) and day past 1 January 2000
+  #
+  # Reference: [https://stjarnhimlen.se/comp/ppcomp.html]
+  
+  # Orbital elements of the sun, as a geocentric object
+  EES <- (0.016709-1.151E-9*n)*pi/180
+  MMS <- (356.0470+0.9856002585*n)*pi/180
+  WWS <- (282.9404+4.70935E-5*n)*pi/180
+  
+  # Geocentric position of the sun
+  ES <- MMS+EES*sin(MMS)*(1.0+EES*cos(MMS))
+  XVS <- cos(ES)-EES
+  YVS <- sqrt(1.0-EES*EES)*sin(ES)
+  VS <- atan2(YVS,XVS)	
+  RS <- sqrt(XVS*XVS+YVS*YVS)
+  LONSUN <- VS+WWS
+  XS <- RS*cos(LONSUN)
+  YS <- RS*sin(LONSUN)
+  
+  # Geocentric coordinates of planet
+  XG <- xh+XS
+  YG <- yh+YS
+  ZG <- zh
+  
+  # Ecliptic coordinates
+  ECL <- (23.4393-3.563E-7*n)*pi/180
+  XE <- XG
+  YE <- YG*cos(ECL)-ZG*sin(ECL)
+  ZE <- YG*sin(ECL)+ZG*cos(ECL)
+  
+  # Final output in equatorial coordinates
+  return(atan2(YE,XE)*24/6.28319)
+}
+
 #### Actual code begins!
 
 data <- read_csv('~/astrolabe_analysis/observations.csv') %>%
@@ -378,9 +443,11 @@ data_individual %>%
 known_radii <- tibble(object=factor(c('Venus','Mars','Jupiter','Saturn')),
                       true_radius=c(0.72,1.5,5.2,9.6))
 
-periods_radii <- data_individual %>%
+data_planetary <- data_individual %>%
   filter(solar_system_object&object!='Sun'&object!='Moon') %>% # Only planets orbit the sun
-  mutate(object=factor(object,c('Venus','Mars','Jupiter','Saturn'))) %>% # Order planets by orbit position
+  mutate(object=factor(object,c('Venus','Mars','Jupiter','Saturn'))) # Order planets by orbit position
+
+periods_radii <- data_planetary %>% 
   mutate(diff=right_ascension-sun_right_ascension) %>%  # Referencing against the sun
   group_by(object,round(diff/2)*2) %>% # Does the recurrence grouping: 2 hour bins 
   nest(data=date) %>%
@@ -408,6 +475,42 @@ periods_radii %>%
   ggplot() + geom_boxplot(aes(radius,object)) +
   geom_point(aes(true_radius,object),color='red',shape='square') +
   xlab('Orbital semi-major axis (AU)')
+
+### Planet actual locations
+
+# Load orbital elements and first order corrections
+# Note: orbital elements from [https://stjarnhimlen.se/comp/ppcomp.html]
+orbital_elements <- read_csv('~/astrolabe_analysis/orbital_elements.csv')
+
+data_planetary_extended <- data_planetary %>% 
+  left_join(orbital_elements,by='object') %>%
+  mutate(n=as.duration(ymd('2000-01-01') %--% date)/ddays(1),
+         NN=(n0+n*n1)*pi/180,
+         II=(i0+n*i1)*pi/180,
+         WW=(w0+n*w1)*pi/180,
+         AA=a0+n*a1,
+         EE=e0+n*e1,
+         MM=(m0+n*m1)*pi/180,
+         pos=heliocentric(NN,II,WW,AA,EE,MM)) %>%
+  unnest(pos) %>%
+  mutate(true_right_ascension=planet_ra(n,xh,yh,zh)%%24)
+
+# Right ascension error
+data_planetary_extended %>%
+  mutate(right_ascension_error=(right_ascension-true_right_ascension+6)%%12-6) %>%
+  ggplot(aes(right_ascension_error,object)) + 
+  geom_boxplot()
+
+# True right ascensions
+data_planetary_extended %>%
+  ggplot(aes(x=date,y=true_right_ascension,color=object)) +
+  geom_point() +
+  ylab('Right ascension (hours)') +
+  theme(legend.position = 'top')
+
+# True locations
+data_planetary_extended %>% 
+  ggplot(aes(x=xh,y=yh,color=object)) + geom_point()
 
 ### Determining Venus's orbital radius by fitting a sinusoid
 venus_sinusoid <- nls(diff~a*sin(2*pi*n/b+ph)+12,
