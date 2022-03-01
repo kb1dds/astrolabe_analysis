@@ -164,12 +164,12 @@ planet_xy_from_data <- function(n,ra,r) {
   XE <- -RS*cos(LONSUN)
   YE <- -RS*sin(LONSUN)
   
-  A <- tan(ra*pi/12)
-  c <- (XE-YE)/r
+  tmp <- XE*cos(ra*pi/12)+YE*sin(ra*pi/12)
   
-  phi <- 2*atan2(sqrt(A^2-c^2+1)-1,A+c)
-  
-  return(tibble(xhp=r*cos(phi),yhp=r*sin(phi)))
+  t <- -tmp+sqrt(tmp^2-(1-r^2))
+
+  return(tibble(xhp=XE+t*cos(ra*pi/12),
+                yhp=YE+t*sin(ra*pi/12)))
 }
 
 #### Actual code begins!
@@ -508,6 +508,17 @@ periods_radii %>%
   geom_point(aes(a0,object),color='red',shape='square') + # Note: a0 is mean orbital radius (AU)
   xlab('Orbital semi-major axis (AU)')
 
+# Summary table
+periods_radii %>%
+  left_join(orbital_elements,by='object') %>%
+  filter(radius < 20) %>%
+  group_by(object) %>%
+  summarize(n=n(),
+            true=mean(a0),
+            mean=mean(radius),
+            median=median(radius),
+            sd=sd(radius))
+
 ### Planet actual locations
 
 data_planetary_extended <- data_planetary %>% 
@@ -526,6 +537,19 @@ data_planetary_extended <- data_planetary %>%
 # Right ascension error
 data_planetary_extended %>%
   mutate(right_ascension_error=(right_ascension-true_right_ascension+6)%%12-6) %>%
+  summarize(n=n(),
+            mean=mean(right_ascension_error),
+            sd=sd(right_ascension_error))
+
+data_planetary_extended %>%
+  mutate(right_ascension_error=(right_ascension-true_right_ascension+6)%%12-6) %>%
+  group_by(object) %>%
+  summarize(n=n(),
+            mean=mean(right_ascension_error),
+            sd=sd(right_ascension_error))
+
+data_planetary_extended %>%
+  mutate(right_ascension_error=(right_ascension-true_right_ascension+6)%%12-6) %>%
   ggplot(aes(right_ascension_error,object)) + 
   geom_boxplot() +
   xlab('Right ascension error (hours)')
@@ -537,9 +561,8 @@ data_planetary_extended %>%
 
 data_planetary_extended %>%
   mutate(right_ascension_error=(right_ascension-true_right_ascension+6)%%12-6) %>%
-  summarize(n=n(),
-            mean=mean(right_ascension_error),
-            sd=sd(right_ascension_error))
+  ggplot(aes(date,right_ascension_error,color=object)) +
+  geom_point()
 
 # True right ascensions
 data_planetary_extended %>%
@@ -555,8 +578,22 @@ data_planetary_extended %>%
 # True planet locations
 data_planetary_extended %>% 
   mutate(pos=planet_xy_from_data(n,right_ascension,AA)) %>%
-  unnest(pos) %>%
+  unnest(pos) %>% # view()
   ggplot(aes(x=xhp,y=yhp,color=object)) + geom_point()
+
+# Orrery plot of true positions (circles) connected to observed positions (triangles)
+data_planetary_extended %>% 
+  left_join(periods_radii %>% group_by(object) %>% summarize(radius=median(radius,na.rm = TRUE)),
+            by='object') %>%
+  mutate(pos=planet_xy_from_data(n,right_ascension,radius)) %>%
+  unnest(pos) %>%
+  ggplot() + 
+  geom_segment(aes(x=xh,y=yh,
+                   xend=xhp,yend=yhp,color=object)) +
+  geom_point(aes(x=xh,y=yh),shape=1) +
+  geom_point(aes(x=xhp,y=yhp),shape=2) +
+  theme(legend.position = 'top') +
+  coord_fixed()
 
 ### Determining Venus's orbital radius by fitting a sinusoid
 venus_sinusoid <- nls(diff~a*sin(2*pi*n/b+ph)+12,
