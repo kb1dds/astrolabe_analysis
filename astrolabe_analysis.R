@@ -145,7 +145,45 @@ planet_ra <- function(n,xh,yh,zh){
   return(atan2(YE,XE)*24/6.28319)
 }
 
+planet_xy_from_data <- function(n,ra,r) {
+  # Determine planet xh,yh heliocentric coordinates from a radius estimate (r) in AU 
+  # and date past 1 Jan 2000
+  
+  # Orbital elements of the earth around the sun
+  EES <- (0.016709-1.151E-9*n)*pi/180
+  MMS <- (356.0470+0.9856002585*n)*pi/180
+  WWS <- (282.9404+4.70935E-5*n)*pi/180
+  
+  # Heliocentric position of the earth
+  ES <- MMS+EES*sin(MMS)*(1.0+EES*cos(MMS))
+  XVS <- cos(ES)-EES
+  YVS <- sqrt(1.0-EES*EES)*sin(ES)
+  VS <- atan2(YVS,XVS)	
+  RS <- sqrt(XVS*XVS+YVS*YVS)
+  LONSUN <- VS+WWS
+  XE <- -RS*cos(LONSUN)
+  YE <- -RS*sin(LONSUN)
+  
+  tmp <- XE*cos(ra*pi/12)+YE*sin(ra*pi/12)
+  
+  t <- -tmp+sqrt(tmp^2-(1-r^2))
+
+  return(tibble(xhp=XE+t*cos(ra*pi/12),
+                yhp=YE+t*sin(ra*pi/12)))
+}
+
 #### Actual code begins!
+
+# Set the planets in orbit order (I can't see Pluto anyway, so no need to quibble here!)
+planets <- c('Mercury','Venus','Mars','Jupiter','Saturn','Uranus','Neptune')
+
+# Set the phases in proper order
+# This is a small hack because I record Moon phase as waxing or waning, 
+# but I don't record wax/wane status on other objects... perhaps I should!
+phases<-c(sapply(1:99,function(x){sprintf('Wax%02d',x)}),
+          'Full',
+          sapply(99:1,function(x){sprintf('Wane%02d',x)}),
+          1:99) # Bit of a hack here...
 
 data <- read_csv('~/astrolabe_analysis/observations.csv') %>%
   mutate(`UTC date`=mdy(`UTC date`,tz='UTC'),
@@ -291,14 +329,6 @@ data_individual <- data_individual %>%
   mutate(solar_system_object=!is.na(right_ascension)) %>%
   mutate(sun_right_ascension=sun_ra(date)) # Yes, it looks like we recomputed this.. oh well
 
-# Set the phases in proper order
-# This is a small hack because I record Moon phase as waxing or waning, 
-# but I don't record wax/wane status on other objects... perhaps I should!
-phases<-c(sapply(1:99,function(x){sprintf('Wax%02d',x)}),
-          'Full',
-          sapply(99:1,function(x){sprintf('Wane%02d',x)}),
-          1:99) # Bit of a hack here...
-
 data_individual <- data_individual %>% 
   mutate(phase=factor(phase,phases))
 
@@ -437,15 +467,17 @@ data_individual %>%
 
 #### Determining orbital radii
 
+# Load orbital elements and first order corrections
+# Note: orbital elements from [https://stjarnhimlen.se/comp/ppcomp.html]
+orbital_elements <- read_csv('~/astrolabe_analysis/orbital_elements.csv') %>% # Only planets orbit the sun
+  mutate(object=factor(object,planets)) 
+
 ### Planetary orbital radii all at once, by looking at elapsed time between 
 ### right ascension recurrences
 
-known_radii <- tibble(object=factor(c('Venus','Mars','Jupiter','Saturn')),
-                      true_radius=c(0.72,1.5,5.2,9.6))
-
 data_planetary <- data_individual %>%
   filter(solar_system_object&object!='Sun'&object!='Moon') %>% # Only planets orbit the sun
-  mutate(object=factor(object,c('Venus','Mars','Jupiter','Saturn'))) # Order planets by orbit position
+  mutate(object=factor(object,planets)) # Order planets by orbit position
 
 periods_radii <- data_planetary %>% 
   mutate(diff=right_ascension-sun_right_ascension) %>%  # Referencing against the sun
@@ -470,36 +502,67 @@ periods_radii %>%
   xlab('Synodic period (days)')
 
 periods_radii %>% 
-  left_join(known_radii,by='object') %>%
+  left_join(orbital_elements,by='object') %>%
   filter(radius < 20) %>%
   ggplot() + geom_boxplot(aes(radius,object)) +
-  geom_point(aes(true_radius,object),color='red',shape='square') +
+  geom_point(aes(a0,object),color='red',shape='square') + # Note: a0 is mean orbital radius (AU)
   xlab('Orbital semi-major axis (AU)')
+
+# Summary table
+periods_radii %>%
+  left_join(orbital_elements,by='object') %>%
+  filter(radius < 20) %>%
+  group_by(object) %>%
+  summarize(n=n(),
+            true=mean(a0),
+            mean=mean(radius),
+            median=median(radius),
+            sd=sd(radius))
 
 ### Planet actual locations
 
-# Load orbital elements and first order corrections
-# Note: orbital elements from [https://stjarnhimlen.se/comp/ppcomp.html]
-orbital_elements <- read_csv('~/astrolabe_analysis/orbital_elements.csv')
-
 data_planetary_extended <- data_planetary %>% 
-  left_join(orbital_elements,by='object') %>%
-  mutate(n=as.duration(ymd('2000-01-01') %--% date)/ddays(1),
-         NN=(n0+n*n1)*pi/180,
+  left_join(orbital_elements,by='object')  %>%
+  mutate(n=as.duration(ymd('2000-01-01') %--% date)/ddays(1), # Compute corrections to orbital elements
+         NN=(n0+n*n1)*pi/180, 
          II=(i0+n*i1)*pi/180,
          WW=(w0+n*w1)*pi/180,
          AA=a0+n*a1,
          EE=e0+n*e1,
          MM=(m0+n*m1)*pi/180,
-         pos=heliocentric(NN,II,WW,AA,EE,MM)) %>%
+         pos=heliocentric(NN,II,WW,AA,EE,MM)) %>% # Predict planet heliocentric positions
   unnest(pos) %>%
   mutate(true_right_ascension=planet_ra(n,xh,yh,zh)%%24)
 
 # Right ascension error
 data_planetary_extended %>%
   mutate(right_ascension_error=(right_ascension-true_right_ascension+6)%%12-6) %>%
+  summarize(n=n(),
+            mean=mean(right_ascension_error),
+            sd=sd(right_ascension_error))
+
+data_planetary_extended %>%
+  mutate(right_ascension_error=(right_ascension-true_right_ascension+6)%%12-6) %>%
+  group_by(object) %>%
+  summarize(n=n(),
+            mean=mean(right_ascension_error),
+            sd=sd(right_ascension_error))
+
+data_planetary_extended %>%
+  mutate(right_ascension_error=(right_ascension-true_right_ascension+6)%%12-6) %>%
   ggplot(aes(right_ascension_error,object)) + 
-  geom_boxplot()
+  geom_boxplot() +
+  xlab('Right ascension error (hours)')
+
+data_planetary_extended %>%
+  mutate(right_ascension_error=(right_ascension-true_right_ascension+6)%%12-6) %>%
+  ggplot(aes(right_ascension_error)) + 
+  geom_histogram(bins=50)
+
+data_planetary_extended %>%
+  mutate(right_ascension_error=(right_ascension-true_right_ascension+6)%%12-6) %>%
+  ggplot(aes(date,right_ascension_error,color=object)) +
+  geom_point()
 
 # True right ascensions
 data_planetary_extended %>%
@@ -508,9 +571,29 @@ data_planetary_extended %>%
   ylab('Right ascension (hours)') +
   theme(legend.position = 'top')
 
-# True locations
+# True planet locations
 data_planetary_extended %>% 
   ggplot(aes(x=xh,y=yh,color=object)) + geom_point()
+
+# True planet locations
+data_planetary_extended %>% 
+  mutate(pos=planet_xy_from_data(n,right_ascension,AA)) %>%
+  unnest(pos) %>% # view()
+  ggplot(aes(x=xhp,y=yhp,color=object)) + geom_point()
+
+# Orrery plot of true positions (circles) connected to observed positions (triangles)
+data_planetary_extended %>% 
+  left_join(periods_radii %>% group_by(object) %>% summarize(radius=median(radius,na.rm = TRUE)),
+            by='object') %>%
+  mutate(pos=planet_xy_from_data(n,right_ascension,radius)) %>%
+  unnest(pos) %>%
+  ggplot() + 
+  geom_segment(aes(x=xh,y=yh,
+                   xend=xhp,yend=yhp,color=object)) +
+  geom_point(aes(x=xh,y=yh),shape=1) +
+  geom_point(aes(x=xhp,y=yhp),shape=2) +
+  theme(legend.position = 'top') +
+  coord_fixed()
 
 ### Determining Venus's orbital radius by fitting a sinusoid
 venus_sinusoid <- nls(diff~a*sin(2*pi*n/b+ph)+12,
