@@ -595,6 +595,35 @@ data_planetary_extended %>%
   theme(legend.position = 'top') +
   coord_fixed()
 
+### Determining Venus's orbital radius by parallax
+
+data_planetary %>%
+  filter(object=='Venus') %>%
+  mutate(diff=right_ascension-sun_right_ascension) %>%  # Referencing against the sun
+  ggplot(aes(date,diff)) +
+  geom_point() +
+  geom_ref_line(h=0) +
+  geom_ref_line(h=12) +
+  geom_ref_line(h=-12) +
+  ylab('Venus right ascension offset from sun (hours)') 
+  
+data_planetary %>%
+  filter(object=='Venus') %>%
+  mutate(diff=right_ascension-sun_right_ascension) %>%  # Referencing against the sun
+  mutate(radial_estimate=abs(sin(diff*pi/12))) %>%
+  ggplot(aes(radial_estimate)) + 
+  geom_histogram(bins=20) +
+  geom_ref_line(v=orbital_elements[orbital_elements$object=='Venus',]$a0) +
+  xlab('Venus orbital semi-major axis (AU)')
+
+data_planetary %>%
+  filter(object=='Venus') %>%
+  mutate(diff=right_ascension-sun_right_ascension) %>%  # Referencing against the sun
+  mutate(radial_estimate=abs(sin(diff*pi/12))) %>%
+  summarize(semimajor_mean=mean(radial_estimate),
+            semimajor_median=median(radial_estimate),
+            stddev=sd(radial_estimate))
+
 ### Determining Venus's orbital radius by fitting a sinusoid
 venus_sinusoid <- nls(diff~a*sin(2*pi*n/b+ph)+12,
     start=list(a=3,b=600,ph=0), # Eyeballed off graph
