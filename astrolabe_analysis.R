@@ -359,6 +359,14 @@ data_individual %>%
   stat_count() + 
   xlab('Sightings per observing session')
 
+data_individual %>% 
+  filter(!is.na(right_ascension),object!='Moon') %>%
+  group_by(date,daytime) %>% 
+  count() %>% 
+  ggplot(aes(as.factor(n),fill=daytime)) + 
+  stat_count() + 
+  xlab('Sightings per observing session')
+
 #### Elevation estimation error
 
 # Sun elevation error
