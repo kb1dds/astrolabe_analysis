@@ -37,9 +37,6 @@ radc2a <- function(lat,ra,dec,st){
 	
   num <- -sin(lha)*cos(decrd)/cos(el)
   den <- (sin(decrd)-sin(el)*sin(latrd))/(cos(el)*cos(latrd))
-  if( atan2(num,den) < 0){
-    return(atan2(num,den)+2*pi)
-  }
   return(atan2(num,den))
 }
 
@@ -143,6 +140,42 @@ planet_ra <- function(n,xh,yh,zh){
   
   # Final output in equatorial coordinates
   return(atan2(YE,XE)*24/6.28319)
+}
+
+planet_dc <- function(n,xh,yh,zh){
+  # Compute right ascension of a planet based on its heliocentric 
+  # coordinates (xh,yh,zh) and day past 1 January 2000
+  #
+  # Reference: [https://stjarnhimlen.se/comp/ppcomp.html]
+  
+  # Orbital elements of the sun, as a geocentric object
+  EES <- (0.016709-1.151E-9*n)*pi/180
+  MMS <- (356.0470+0.9856002585*n)*pi/180
+  WWS <- (282.9404+4.70935E-5*n)*pi/180
+  
+  # Geocentric position of the sun
+  ES <- MMS+EES*sin(MMS)*(1.0+EES*cos(MMS))
+  XVS <- cos(ES)-EES
+  YVS <- sqrt(1.0-EES*EES)*sin(ES)
+  VS <- atan2(YVS,XVS)	
+  RS <- sqrt(XVS*XVS+YVS*YVS)
+  LONSUN <- VS+WWS
+  XS <- RS*cos(LONSUN)
+  YS <- RS*sin(LONSUN)
+  
+  # Geocentric coordinates of planet
+  XG <- xh+XS
+  YG <- yh+YS
+  ZG <- zh
+  
+  # Ecliptic coordinates
+  ECL <- (23.4393-3.563E-7*n)*pi/180
+  XE <- XG
+  YE <- YG*cos(ECL)-ZG*sin(ECL)
+  ZE <- YG*sin(ECL)+ZG*cos(ECL)
+  
+  # Final output in equatorial coordinates
+  return(atan2(ZE,sqrt(XE^2+YE^2))*180/pi)
 }
 
 planet_xy_from_data <- function(n,ra,r) {
@@ -540,7 +573,17 @@ data_planetary_extended <- data_planetary %>%
          MM=(m0+n*m1)*pi/180,
          pos=heliocentric(NN,II,WW,AA,EE,MM)) %>% # Predict planet heliocentric positions
   unnest(pos) %>%
-  mutate(true_right_ascension=planet_ra(n,xh,yh,zh)%%24)
+  mutate(sidereal_time=utc2s(Longitude+360,date),
+         true_right_ascension=planet_ra(n,xh,yh,zh)%%24,
+         true_declination=planet_dc(n,xh,yh,zh),
+         true_elevation=rad2ce(Latitude,
+                               true_right_ascension,
+                               true_declination,
+                               sidereal_time)*180/pi,
+         true_azimuth=radc2a(Latitude,
+                             true_right_ascension,
+                             true_declination,
+                             sidereal_time)*180/pi)
 
 # Right ascension error
 data_planetary_extended %>%
@@ -571,6 +614,27 @@ data_planetary_extended %>%
   mutate(right_ascension_error=(right_ascension-true_right_ascension+6)%%12-6) %>%
   ggplot(aes(date,right_ascension_error,color=object)) +
   geom_point()
+
+# Checking if Chaucer is right: when a planet is near due south, 
+# right ascension error increases
+data_planetary_extended %>%
+  mutate(right_ascension_error=(right_ascension-true_right_ascension+6)%%12-6) %>%
+  ggplot(aes(true_azimuth%%360,right_ascension_error,color=object)) +
+  geom_ref_line(v=180) +
+  geom_point() +
+  xlab('Azimuth (degrees)') +
+  ylab('Right ascension error (hours)') +
+  theme(legend.position = 'top')
+
+# Testing East/West azimuth dependence of positive/negative right ascension errors
+data_planetary_extended %>%
+  mutate(right_ascension_error=(right_ascension-true_right_ascension+6)%%12-6,
+         easterly=true_azimuth%%360<180,
+         pos_ra_error=right_ascension_error>0) %>%
+  group_by(easterly,pos_ra_error) %>%
+  summarize(n=n(),
+            mean=mean(right_ascension_error),
+            sd=sd(right_ascension_error)) 
 
 # True right ascensions
 data_planetary_extended %>%
