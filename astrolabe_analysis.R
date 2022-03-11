@@ -400,6 +400,19 @@ data_individual %>%
   stat_count() + 
   xlab('Sightings per observing session')
 
+# Time estimation accuracy versus number of sightings
+data_individual %>% 
+  mutate(time_diff = interval(`Local true apparent solar time`,
+                              `Local mean time`,tzone='EST')/60) %>%
+  filter(!is.na(right_ascension),object!='Moon') %>%
+  group_by(date,daytime) %>% 
+  add_count() %>%
+  ggplot(aes(as.factor(n),time_diff)) + 
+  geom_boxplot() +
+  xlab('Sightings per observing session') +
+  ylab('Time estimation error (minutes)') +
+  scale_y_continuous(limits=c(-120,120))
+
 #### Elevation estimation error
 
 # Sun elevation error
