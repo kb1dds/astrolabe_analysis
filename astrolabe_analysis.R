@@ -259,8 +259,10 @@ data %>%
   mutate(time_diff = interval(`Local true apparent solar time`,
                               `Local mean time`,tzone='EST'),
          daytime=is.na(`Sun elevation`)) %>%
-  ggplot(aes(x=date,y=time_diff/60,color=daytime)) + 
+  mutate(daytime=factor(if_else(daytime,'Day','Night'),c('Day','Night'))) %>%
+  ggplot(aes(x=date,y=time_diff/60,color=daytime,shape=daytime)) + 
   geom_point() +
+  scale_color_discrete() +
   ylim(-120,120) + 
   ylab('Error (minutes)') +
   theme(legend.position = 'top')
@@ -374,8 +376,10 @@ data_individual <- left_join(data_individual,starchart,by='object') %>%
 
 # What's in the data?
 data_individual %>% 
+  mutate(daytime=factor(if_else(daytime,'Day','Night'),c('Night','Day'))) %>%
   ggplot(aes(y=object,fill=daytime)) + 
   geom_bar() +
+  scale_fill_grey() +
   theme(legend.position = 'top')
 
 data_individual %>% 
@@ -387,17 +391,21 @@ data_individual %>%
 
 data_individual %>% 
   group_by(date,daytime) %>% 
+  mutate(daytime=factor(if_else(daytime,'Day','Night'),c('Night','Day'))) %>%
   count() %>% 
   ggplot(aes(as.factor(n),fill=daytime)) + 
   stat_count() + 
+  scale_fill_grey() +
   xlab('Sightings per observing session')
 
 data_individual %>% 
   filter(!is.na(right_ascension),object!='Moon') %>%
+  mutate(daytime=factor(if_else(daytime,'Day','Night'),c('Night','Day'))) %>%
   group_by(date,daytime) %>% 
   count() %>% 
   ggplot(aes(as.factor(n),fill=daytime)) + 
   stat_count() + 
+  scale_fill_grey() +
   xlab('Sightings per observing session')
 
 # Time estimation accuracy versus number of sightings
