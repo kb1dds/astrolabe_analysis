@@ -647,6 +647,16 @@ data_planetary_extended %>%
   ylab('Right ascension error (hours)') +
   theme(legend.position = 'top')
 
+# Seeing if declination impacts right ascension error.  
+# It seems that Jupiter is generally worse, but otherwise not much of an impact
+data_planetary_extended %>%
+  mutate(right_ascension_error=(right_ascension-true_right_ascension+6)%%12-6) %>%
+  ggplot(aes(true_declination,right_ascension_error,color=object)) +
+  geom_point() +
+  xlab('Declination (degrees)') +
+  ylab('Right ascension error (hours)') +
+  theme(legend.position = 'top')
+
 # Testing East/West azimuth dependence of positive/negative right ascension errors
 data_planetary_extended %>%
   mutate(right_ascension_error=(right_ascension-true_right_ascension+6)%%12-6,
