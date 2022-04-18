@@ -539,12 +539,13 @@ data_individual %>%
          object!='Moon',
          object!='Sun') %>%
   mutate(object=ordered(object,planets)) %>%
-  mutate(right_ascension_diff=right_ascension-sun_right_ascension) %>%
+  mutate(right_ascension_diff=(right_ascension-sun_right_ascension)%%24) %>%
+  mutate(right_ascension_diff=if_else(right_ascension_diff>12,
+                                      right_ascension_diff-24,right_ascension_diff)) %>%
   ggplot(aes(x=date,y=right_ascension_diff,color=object)) +
   geom_ref_line(h=0) +
   geom_ref_line(h=12) +
   geom_ref_line(h=-12) +
-  geom_ref_line(h=-24) +
   geom_point() +
   ylab('Sun-relative right ascension (hours)') +
   theme(legend.position = 'top')
@@ -745,7 +746,8 @@ data_planetary %>%
   filter(object=='Venus') %>%
   mutate(diff=right_ascension-sun_right_ascension) %>%  # Referencing against the sun
   mutate(radial_estimate=abs(sin(diff*pi/12))) %>%
-  summarize(semimajor_mean=mean(radial_estimate),
+  summarize(n=n(),
+            semimajor_mean=mean(radial_estimate),
             semimajor_median=median(radial_estimate),
             stddev=sd(radial_estimate))
 
