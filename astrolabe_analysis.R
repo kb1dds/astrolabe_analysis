@@ -209,6 +209,7 @@ planet_xy_from_data <- function(n,ra,r) {
 
 # Set the planets in orbit order (I can't see Pluto anyway, so no need to quibble here!)
 planets <- c('Mercury','Venus','Mars','Jupiter','Saturn','Uranus','Neptune')
+planet_colors <- c('#555555','#ff0000','#ff9900','#00ff00') # Note: only the planets in the data are colored...
 
 # Set the phases in proper order
 # This is a small hack because I record Moon phase as waxing or waning, 
@@ -511,6 +512,7 @@ data_individual %>%
   mutate(object=ordered(object,planets)) %>%
   ggplot(aes(x=date,y=right_ascension,color=object)) +
   geom_point() +
+  scale_color_manual(values=planet_colors)+
   geom_line(aes(x=date,y=right_ascension),
             data = data_individual %>% 
               filter(object=='Sun') %>% 
@@ -543,6 +545,7 @@ data_individual %>%
   mutate(right_ascension_diff=if_else(right_ascension_diff>12,
                                       right_ascension_diff-24,right_ascension_diff)) %>%
   ggplot(aes(x=date,y=right_ascension_diff,color=object)) +
+  scale_color_manual(values=planet_colors)+
   geom_ref_line(h=0) +
   geom_ref_line(h=12) +
   geom_ref_line(h=-12) +
@@ -657,6 +660,7 @@ data_planetary_extended %>%
 data_planetary_extended %>%
   mutate(right_ascension_error=(right_ascension-true_right_ascension+6)%%12-6) %>%
   ggplot(aes(date,right_ascension_error,color=object)) +
+  scale_color_manual(values=planet_colors)+
   geom_point()
 
 # Checking if Chaucer is right: when a planet is near due south, 
@@ -664,6 +668,7 @@ data_planetary_extended %>%
 data_planetary_extended %>%
   mutate(right_ascension_error=(right_ascension-true_right_ascension+6)%%12-6) %>%
   ggplot(aes(true_azimuth%%360,right_ascension_error,color=object)) +
+  scale_color_manual(values=planet_colors)+
   geom_ref_line(v=180) +
   geom_point() +
   xlab('Azimuth (degrees)') +
@@ -675,6 +680,7 @@ data_planetary_extended %>%
 data_planetary_extended %>%
   mutate(right_ascension_error=(right_ascension-true_right_ascension+6)%%12-6) %>%
   ggplot(aes(true_declination,right_ascension_error,color=object)) +
+  scale_color_manual(values=planet_colors)+
   geom_point() +
   xlab('Declination (degrees)') +
   ylab('Right ascension error (hours)') +
@@ -694,18 +700,21 @@ data_planetary_extended %>%
 data_planetary_extended %>%
   ggplot(aes(x=date,y=true_right_ascension,color=object)) +
   geom_point() +
+  scale_color_manual(values=planet_colors)+
   ylab('Right ascension (hours)') +
   theme(legend.position = 'top')
 
 # True planet locations
 data_planetary_extended %>% 
-  ggplot(aes(x=xh,y=yh,color=object)) + geom_point()
+  ggplot(aes(x=xh,y=yh,color=object)) + geom_point() +
+  scale_color_manual(values=planet_colors)
 
 # True planet locations
 data_planetary_extended %>% 
   mutate(pos=planet_xy_from_data(n,right_ascension,AA)) %>%
   unnest(pos) %>% # view()
-  ggplot(aes(x=xhp,y=yhp,color=object)) + geom_point()
+  ggplot(aes(x=xhp,y=yhp,color=object)) + geom_point() +
+  scale_color_manual(values=planet_colors)
 
 # Orrery plot of true positions (circles) connected to observed positions (triangles)
 data_planetary_extended %>% 
@@ -718,6 +727,7 @@ data_planetary_extended %>%
                    xend=xhp,yend=yhp,color=object)) +
   geom_point(aes(x=xh,y=yh),shape=1) +
   geom_point(aes(x=xhp,y=yhp),shape=2) +
+  scale_color_manual(values=planet_colors)+
   theme(legend.position = 'top') +
   coord_fixed()
 
@@ -881,3 +891,4 @@ data_individual %>%
   geom_ref_line(v=12)+
   geom_ref_line(v=24)+
   geom_point()
+
