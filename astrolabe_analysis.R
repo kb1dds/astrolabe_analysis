@@ -507,9 +507,30 @@ summary(elevation_anova)
 #### Planets
 
 data_individual %>% 
-  filter(solar_system_object,object!='Moon') %>%
+  filter(solar_system_object,object!='Moon',object != 'Sun') %>%
+  mutate(object=ordered(object,planets)) %>%
   ggplot(aes(x=date,y=right_ascension,color=object)) +
   geom_point() +
+  geom_line(aes(x=date,y=right_ascension),
+            data = data_individual %>% 
+              filter(object=='Sun') %>% 
+              filter(date<mdy('3/22/2019')),
+            color='black') +
+  geom_line(aes(x=date,y=right_ascension),
+            data = data_individual %>% 
+              filter(object=='Sun') %>% 
+              filter(date>mdy('3/22/2019'),date<mdy('3/22/2020')),
+            color='black') +
+  geom_line(aes(x=date,y=right_ascension),
+            data = data_individual %>% 
+              filter(object=='Sun') %>% 
+              filter(date>mdy('3/22/2020'),date<mdy('3/20/2021')),
+            color='black') +
+  geom_line(aes(x=date,y=right_ascension),
+            data = data_individual %>% 
+              filter(object=='Sun') %>% 
+              filter(date>mdy('3/20/2021'),date<mdy('3/22/2022')),
+            color='black') +
   ylab('Right ascension (hours)') +
   theme(legend.position = 'top')
 
@@ -517,14 +538,15 @@ data_individual %>%
   filter(solar_system_object,
          object!='Moon',
          object!='Sun') %>%
+  mutate(object=ordered(object,planets)) %>%
   mutate(right_ascension_diff=right_ascension-sun_right_ascension) %>%
   ggplot(aes(x=date,y=right_ascension_diff,color=object)) +
-  geom_point() +
   geom_ref_line(h=0) +
   geom_ref_line(h=12) +
   geom_ref_line(h=-12) +
   geom_ref_line(h=-24) +
-  ylab('Right ascension offset from sun (hours)') +
+  geom_point() +
+  ylab('Sun-relative right ascension (hours)') +
   theme(legend.position = 'top')
 
 #### Determining orbital radii
@@ -532,14 +554,14 @@ data_individual %>%
 # Load orbital elements and first order corrections
 # Note: orbital elements from [https://stjarnhimlen.se/comp/ppcomp.html]
 orbital_elements <- read_csv('~/astrolabe_analysis/orbital_elements.csv') %>% # Only planets orbit the sun
-  mutate(object=factor(object,planets)) 
+  mutate(object=ordered(object,planets)) 
 
 ### Planetary orbital radii all at once, by looking at elapsed time between 
 ### right ascension recurrences
 
 data_planetary <- data_individual %>%
   filter(solar_system_object&object!='Sun'&object!='Moon') %>% # Only planets orbit the sun
-  mutate(object=factor(object,planets)) # Order planets by orbit position
+  mutate(object=ordered(object,planets)) # Order planets by orbit position
 
 periods_radii <- data_planetary %>% 
   mutate(diff=right_ascension-sun_right_ascension) %>%  # Referencing against the sun
@@ -708,7 +730,7 @@ data_planetary %>%
   geom_ref_line(h=0) +
   geom_ref_line(h=12) +
   geom_ref_line(h=-12) +
-  ylab('Venus right ascension offset from sun (hours)') 
+  ylab('Sun-relative right ascension of Venus (hours)') 
   
 data_planetary %>%
   filter(object=='Venus') %>%
@@ -749,7 +771,7 @@ data_individual %>% filter(object=='Venus') %>%
   geom_ref_line(h=12) + 
   geom_ref_line(h=24) + 
   xlab('Julian date') +
-  ylab('Venus-to-sun right ascension difference (hours)') +
+  ylab('Sun-relative right ascension of Venus (hours)') +
   theme(legend.position = 'top')
 
 venus_radius<-(coef(venus_sinusoid)[[2]]/(coef(venus_sinusoid)[[2]]+365))^(2/3)
@@ -762,7 +784,7 @@ data_individual %>% filter(object=='Mars') %>%
   geom_point(aes(x=n,y=diff)) +
   geom_ref_line(h=12)+
   xlab('Julian date') +
-  ylab('Mars-to-sun right ascension difference (hours)') +
+  ylab('Sun-relative right ascension of Mars (hours)') +
   theme(legend.position = 'top')
 
 mars_radius<-(800/(800-365))^(2/3)
@@ -792,7 +814,7 @@ odata %>%
   geom_abline(slope=coef(lfit_2020)[2],intercept=coef(lfit_2020)[1]) +
   geom_abline(slope=coef(lfit_2021)[2],intercept=coef(lfit_2021)[1]) +
   xlab('Date') +
-  ylab('Jupiter-to-sun right ascension difference (hours)') +
+  ylab('Sun-relative right ascension of Jupiter (hours)') +
   theme(legend.position = 'top')
 
 # Determine radius of Jupiter's orbit in astronomical units, using
@@ -832,7 +854,7 @@ odata %>%
   geom_abline(slope=coef(lfit_2020)[2],intercept=coef(lfit_2020)[1]) +
   geom_abline(slope=coef(lfit_2021)[2],intercept=coef(lfit_2021)[1]) +
   xlab('Date') +
-  ylab('Saturn-to-sun right ascension difference (hours)') +
+  ylab('Sun-relative right ascension of Saturn (hours)') +
   theme(legend.position = 'top')
 
 #### Phase analysis
