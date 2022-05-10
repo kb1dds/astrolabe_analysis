@@ -740,7 +740,7 @@ data_planetary_extended %>%
 
 data_planetary %>%
   filter(object=='Venus') %>%
-  mutate(diff=right_ascension-sun_right_ascension) %>%  # Referencing against the sun
+  mutate(diff=(right_ascension-sun_right_ascension+6)%%12-6) %>%  # Referencing against the sun
   ggplot(aes(date,diff)) +
   geom_point() +
   geom_ref_line(h=0) +
@@ -748,6 +748,16 @@ data_planetary %>%
   geom_ref_line(h=-12) +
   ylab('Sun-relative right ascension of Venus (hours)') 
   
+data_planetary %>%
+  filter(object=='Venus') %>%
+  mutate(diff=(right_ascension-sun_right_ascension+6)%%12-6) %>%  # Referencing against the sun
+  ggplot(aes(date,diff,color=phase)) +
+  geom_point() +
+  geom_ref_line(h=0) +
+  geom_ref_line(h=12) +
+  geom_ref_line(h=-12) +
+  ylab('Sun-relative right ascension of Venus (hours)') 
+
 data_planetary %>%
   filter(object=='Venus') %>%
   mutate(diff=right_ascension-sun_right_ascension) %>%  # Referencing against the sun
