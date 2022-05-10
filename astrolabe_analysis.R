@@ -219,7 +219,7 @@ phases<-c(sapply(1:99,function(x){sprintf('Wax%02d',x)}),
           sapply(99:1,function(x){sprintf('Wane%02d',x)}),
           1:99) # Bit of a hack here...
 
-data <- read_csv('~/astrolabe_analysis/observations.csv') %>%
+data <- read_csv('observations.csv') %>%
   mutate(`UTC date`=mdy(`UTC date`,tz='UTC'),
          date=`UTC date`+`UTC time`,
          `Local true apparent solar time`=hms::as_hms(with_tz(date,tzone='EST')),
@@ -490,11 +490,16 @@ elevation_data %>%
   geom_boxplot()
 
 elevation_data %>% 
-  group_by(Instrument) %>%
   ggplot(aes(elevation,elevation_difference)) +
   geom_point() + 
   geom_smooth(method='lm') +
   scale_y_continuous(limits=c(-5,5))
+
+elevation_data %>%
+  group_by(Instrument) %>% 
+  summarize(mean=mean(elevation_difference,na.rm=TRUE),
+            sd=sd(elevation_difference,na.rm=TRUE),
+            n=n())
 
 # Difference between sun/star elevation error?
 elevation_anova <- with(bind_rows(mutate(elevation_data,
