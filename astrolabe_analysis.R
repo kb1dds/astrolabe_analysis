@@ -210,6 +210,7 @@ planet_xy_from_data <- function(n,ra,r) {
 # Set the planets in orbit order (I can't see Pluto anyway, so no need to quibble here!)
 planets <- c('Mercury','Venus','Mars','Jupiter','Saturn','Uranus','Neptune')
 planet_colors <- c('#555555','#ff0000','#ff9900','#00ff00') # Note: only the planets in the data are colored...
+planet_shapes <- c(1,3,4,8) # Note: only the planets in the data get symbols...
 
 # Set the phases in proper order
 # This is a small hack because I record Moon phase as waxing or waning, 
@@ -549,8 +550,9 @@ data_individual %>%
   mutate(right_ascension_diff=(right_ascension-sun_right_ascension)%%24) %>%
   mutate(right_ascension_diff=if_else(right_ascension_diff>12,
                                       right_ascension_diff-24,right_ascension_diff)) %>%
-  ggplot(aes(x=date,y=right_ascension_diff,color=object)) +
+  ggplot(aes(x=date,y=right_ascension_diff,color=object,shape=object)) +
   scale_color_manual(values=planet_colors)+
+  scale_shape_manual(values=planet_shapes)+
   geom_ref_line(h=0) +
   geom_ref_line(h=12) +
   geom_ref_line(h=-12) +
@@ -664,16 +666,18 @@ data_planetary_extended %>%
 
 data_planetary_extended %>%
   mutate(right_ascension_error=(right_ascension-true_right_ascension+6)%%12-6) %>%
-  ggplot(aes(date,right_ascension_error,color=object)) +
+  ggplot(aes(date,right_ascension_error,color=object,shape=object)) +
   scale_color_manual(values=planet_colors)+
+  scale_shape_manual(values=planet_shapes)+
   geom_point()
 
 # Checking if Chaucer is right: when a planet is near due south, 
 # right ascension error increases
 data_planetary_extended %>%
   mutate(right_ascension_error=(right_ascension-true_right_ascension+6)%%12-6) %>%
-  ggplot(aes(true_azimuth%%360,right_ascension_error,color=object)) +
+  ggplot(aes(true_azimuth%%360,right_ascension_error,color=object,shape=object)) +
   scale_color_manual(values=planet_colors)+
+  scale_shape_manual(values=planet_shapes)+
   geom_ref_line(v=180) +
   geom_point() +
   xlab('Azimuth (degrees)') +
@@ -684,8 +688,9 @@ data_planetary_extended %>%
 # It seems that Jupiter is generally worse, but otherwise not much of an impact
 data_planetary_extended %>%
   mutate(right_ascension_error=(right_ascension-true_right_ascension+6)%%12-6) %>%
-  ggplot(aes(true_declination,right_ascension_error,color=object)) +
+  ggplot(aes(true_declination,right_ascension_error,color=object,shape=object)) +
   scale_color_manual(values=planet_colors)+
+  scale_shape_manual(values=planet_shapes)+
   geom_point() +
   xlab('Declination (degrees)') +
   ylab('Right ascension error (hours)') +
@@ -703,23 +708,26 @@ data_planetary_extended %>%
 
 # True right ascensions
 data_planetary_extended %>%
-  ggplot(aes(x=date,y=true_right_ascension,color=object)) +
+  ggplot(aes(x=date,y=true_right_ascension,color=object,shape=object)) +
   geom_point() +
   scale_color_manual(values=planet_colors)+
+  scale_shape_manual(values=planet_shapes)+
   ylab('Right ascension (hours)') +
   theme(legend.position = 'top')
 
 # True planet locations
 data_planetary_extended %>% 
-  ggplot(aes(x=xh,y=yh,color=object)) + geom_point() +
-  scale_color_manual(values=planet_colors)
+  ggplot(aes(x=xh,y=yh,color=object,shape=object)) + geom_point() +
+  scale_color_manual(values=planet_colors)+
+  scale_shape_manual(values=planet_shapes)
 
 # True planet locations
 data_planetary_extended %>% 
   mutate(pos=planet_xy_from_data(n,right_ascension,AA)) %>%
   unnest(pos) %>% # view()
-  ggplot(aes(x=xhp,y=yhp,color=object)) + geom_point() +
-  scale_color_manual(values=planet_colors)
+  ggplot(aes(x=xhp,y=yhp,color=object,shape=object)) + geom_point() +
+  scale_color_manual(values=planet_colors)+
+  scale_shape_manual(values=planet_shapes)
 
 # Orrery plot of true positions (circles) connected to observed positions (triangles)
 data_planetary_extended %>% 
@@ -729,10 +737,11 @@ data_planetary_extended %>%
   unnest(pos) %>%
   ggplot() + 
   geom_segment(aes(x=xh,y=yh,
-                   xend=xhp,yend=yhp,color=object)) +
+                   xend=xhp,yend=yhp,color=object,shape=object)) +
   geom_point(aes(x=xh,y=yh),shape=1) +
   geom_point(aes(x=xhp,y=yhp),shape=2) +
   scale_color_manual(values=planet_colors)+
+  scale_shape_manual(values=planet_shapes)+
   theme(legend.position = 'top') +
   coord_fixed()
 
@@ -765,6 +774,7 @@ data_planetary %>%
   ggplot(aes(radial_estimate)) + 
   geom_histogram(bins=20) +
   geom_ref_line(v=orbital_elements[orbital_elements$object=='Venus',]$a0) +
+  scale_y_continuous(breaks=c(0,2,4,6,8,10)) +
   xlab('Venus orbital semi-major axis (AU)')
 
 data_planetary %>%
