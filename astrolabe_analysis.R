@@ -580,7 +580,7 @@ periods_radii <- data_planetary %>%
   nest(data=date) %>%
   filter(length(data)>2) %>% # Get rid of bins with too few observations
   unnest(cols=data) %>%
-  reframe(synodic=combn(date,2,function(x){as.duration(x[[1]]%--%x[[2]])/ddays(1)})) %>%
+  summarize(synodic=combn(date,2,function(x){as.duration(x[[1]]%--%x[[2]])/ddays(1)})) %>%
   mutate(synodic=map(synodic,function(x){x[[1]]})%>%unlist) %>% # Compute synodic periods (days)
   mutate(synodic=if_else((object=='Jupiter'|object=='Saturn')&synodic>600, # I observed two full periods for Jupiter and Saturn only, so...
                          synodic/2,  # ...if the period is unusually large we're looking at doubled periods, so split the period in half
