@@ -511,6 +511,26 @@ elevation_anova <- with(bind_rows(mutate(elevation_data,
 
 summary(elevation_anova)
 
+#### Occlusion analysis, basically list all observed az/el pairs
+
+data_individual_azel <- data_individual %>% 
+  mutate(declination=if_else(solar_system_object,0,declination),
+         sidereal_time=utc2s(Longitude+360,date),
+         expected_elevation=rad2ce(Latitude,
+                                   right_ascension,
+                                   declination,
+                                   sidereal_time)*180/pi,
+         expected_azimuth=radc2a(Latitude,
+                               right_ascension,
+                               declination,
+                               sidereal_time)*180/pi)
+
+data_individual_azel %>%
+  ggplot(aes(x=expected_azimuth,
+             y=expected_elevation,
+             color=object)) + 
+  geom_point()
+
 #### Planets
 
 data_individual %>% 
